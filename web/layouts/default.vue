@@ -7,16 +7,16 @@
         </v-container>
       </v-app-bar>
       <v-container>
-        <nuxt/>
+        <nuxt />
       </v-container>
     </v-main>
   </v-app>
 </template>
 
 <script lang="ts">
-import {Component, Vue} from "vue-property-decorator";
+import { Component, Vue } from 'vue-property-decorator'
 
 @Component
-export default class DefaultLayout extends Vue{
+export default class DefaultLayout extends Vue {
 }
 </script>
