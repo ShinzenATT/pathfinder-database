@@ -15,6 +15,7 @@
       :expanded="expanded"
       :page.sync="currentPage"
       :group-by="groupBy"
+      group-desc
       :footer-props="{
         itemsPerPageOptions: [20, 25, 30 , 40, 50, 100, -1]
       }"
@@ -24,20 +25,33 @@
     >
       <template #top>
         <v-card-title>
-          <v-text-field v-model="search" prepend-inner-icon="mdi-magnify" outlined label="Search" />
-          <v-select v-model="groupBy" outlined label="Group by" :items="sortOptions" clearable />
+          <v-row dense>
+            <v-col>
+              <v-text-field v-model="search" style="min-width: 150px" prepend-inner-icon="mdi-magnify" outlined label="Search" />
+            </v-col>
+            <v-col>
+              <v-select
+                v-model="groupBy"
+                style="min-width: 150px"
+                outlined
+                label="Group by"
+                :items="groupOptions"
+                clearable
+              />
+            </v-col>
+          </v-row>
         </v-card-title>
       </template>
 
       <template #group.header="props">
-        <td :colspan="headers.length" @click="props.toggle()">
+        <td :colspan="headers.length + 1" @click="props.toggle()">
           <v-btn v-if="props.isOpen" small icon>
             <v-icon>mdi-menu-up</v-icon>
           </v-btn>
           <v-btn v-else small icon>
             <v-icon>mdi-menu-down</v-icon>
           </v-btn>
-          {{ props.group }}
+          {{ props.group[0] ? props.group : 'Unknown' }}
         </td>
       </template>
 
@@ -59,6 +73,9 @@
             <v-row>
               <v-col cols="9">
                 <h2>{{ props.item.name }}</h2>
+                <h6 v-if="props.item.relatedSpellNames">
+                  {{ props.item.relatedSpellNames.join(', ') }}
+                </h6>
               </v-col>
               <v-col cols="3">
                 <v-btn style="width: 100%" @click="() => overlay = true">
@@ -67,6 +84,7 @@
               </v-col>
               <v-col> {{ getComponentsStr(props.item) }} </v-col>
               <v-col> {{ getClassesStr(props.item.classes) }} </v-col>
+              <v-col> {{ props.item.castingTime.time + ' ' + props.item.castingTime.unit }} </v-col>
               <v-col cols="12">
                 {{ props.item.description }}
               </v-col>
@@ -151,8 +169,13 @@ export default class IndexPage extends Vue {
     }
   ]
 
-  sortOptions = [
-    { text: 'School', value: 'school.school' }
+  groupOptions = [
+    { text: 'School', value: 'school.school' },
+    { text: 'Source Book', value: 'sourceBook' },
+    { text: 'Casting unit', value: 'castingTime.unit' },
+    { text: 'Casting Target', value: 'effect.target' },
+    { text: 'Casting Range', value: 'effect.range' },
+    { text: 'Target Area', value: 'effect.area' }
   ]
 
   getClassesStr (classes: any): string {

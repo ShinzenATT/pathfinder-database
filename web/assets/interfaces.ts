@@ -1,10 +1,10 @@
 // this type may use null instead of undefined
 export interface Spell {
   name: string,
-  link: string,
+  url: string,
   school: {
     school?: string,
-    subSchool?: string,
+    'sub-school'?: string,
     descriptors?: []
   },
   /** key is class and value is number */
@@ -15,10 +15,7 @@ export interface Spell {
     wizard?: number,
     druid?: number
   },
-  castingTime: {
-    unit?: string,
-    time?: string
-  },
+  'casting-time'?: string,
   components: {
     verbal: boolean,
     somatic: boolean,
@@ -33,17 +30,17 @@ export interface Spell {
     duration?: string,
     dismissible: boolean
   },
-  savingThrow: {
+  'saving-throw': {
     fortitude: boolean,
     reflex: boolean,
     will: boolean,
     description?: string
   },
-  spellResistance: {
+  'spell-resistance': {
     applies: boolean,
     description?: string
   },
   description?: string,
-  sourceBook?: string,
-  relatedSpellNames?: string[]
+  'source-book'?: string,
+  'related-spell-names'?: string[]
 }
