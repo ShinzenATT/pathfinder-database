@@ -6,11 +6,12 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"strings"
 	"time"
 )
 
 func main() {
-	sourceFile := "data.json"
+	sourceFile := "spells.json"
 	backup(sourceFile)
 	jsonFile, err := os.Open(sourceFile)
 	if err != nil {
@@ -19,18 +20,24 @@ func main() {
 
 	jsonByte, _ := ioutil.ReadAll(jsonFile)
 
-	var spells []OldSpell
-	newSpells := make(map[string]NewSpell)
+	var spells []Spell
 
 	json.Unmarshal(jsonByte, &spells)
 
-	//formatSpells(spells, newSpells)
-	//addCopyright(spells, newSpells)
-	//addClass(spells, newSpells)
-	updateOldToNew(spells, newSpells)
+	spellList := make(map[string]Spell)
+	for _, spell := range spells {
+		spellList[spell.Name] = spell
+	}
 
-	var output []NewSpell
-	for _, spell := range newSpells {
+	formatSpells(spellList)
+	//addCopyright(spells, spellList)
+	//addClass(spells, spellList)
+	//updateOldToNew(spells, spellList)
+
+	verifyClasses(spellList)
+
+	var output []Spell
+	for _, spell := range spellList {
 		output = append(output, spell)
 	}
 
@@ -51,7 +58,26 @@ func backup(sourceFile string) {
 	ioutil.WriteFile(destinationFile, input, 0644)
 }
 
-func updateOldToNew(spells []OldSpell, newSpells map[string]NewSpell) {
+func verifyClasses(spellList map[string]Spell) {
+	for name, _ := range spellList {
+		for c, level := range spellList[name].Classes {
+			switch c {
+			case "sorcerer/wizard":
+				spellList[name].Classes["sorcerer"] = level
+				spellList[name].Classes["wizard"] = level
+				delete(spellList[name].Classes, "sorcerer/wizard")
+
+			case "summoner/unchained":
+				spellList[name].Classes["summoner"] = level
+				spellList[name].Classes["unchained_summoner"] = level
+				delete(spellList[name].Classes, "summoner/unchained")
+			}
+
+		}
+	}
+}
+
+func updateOldToNew(spells []OldSpell, newSpells map[string]Spell) {
 	for _, old := range spells {
 		newSpell := copySpell(old)
 		newSpells[newSpell.Name] = newSpell
@@ -65,20 +91,17 @@ func nilOrString(in string) *string {
 	return &in
 }
 
-func copySpell(old OldSpell) NewSpell {
-	return NewSpell{
+func copySpell(old OldSpell) Spell {
+	return Spell{
 		Name: old.Name,
-		Link: old.Link,
+		Url:  old.Link,
 		School: School{
 			School:      old.School.School,
 			SubSchool:   nilOrString(old.School.SubSchool),
 			Descriptors: old.School.Descriptors,
 		},
-		Classes: old.Classes,
-		CastingTime: CastingTime{
-			Unit: old.CastingTime.Unit,
-			Time: old.CastingTime.Time,
-		},
+		Classes:     old.Classes,
+		CastingTime: old.CastingTime.Time + " " + old.CastingTime.Unit,
 		Components: Components{
 			Verbal:      old.Components.Verbal,
 			Somatic:     old.Components.Somatic,
@@ -109,7 +132,7 @@ func copySpell(old OldSpell) NewSpell {
 	}
 }
 
-func addClass(spells []OldSpell, newSpells map[string]NewSpell) {
+func addClass(spells []OldSpell, newSpells map[string]Spell) {
 	jsonFile, err := os.Open("class-spells.json")
 	if err != nil {
 		fmt.Println(err)
@@ -144,7 +167,7 @@ func addClass(spells []OldSpell, newSpells map[string]NewSpell) {
 	//fmt.Println(newSpells)
 }
 
-func addCopyright(spells []OldSpell, newSpells map[string]NewSpell) {
+func addCopyright(spells []OldSpell, newSpells map[string]Spell) {
 	jsonFile, err := os.Open("spells-copyright.json")
 	if err != nil {
 		fmt.Println(err)
@@ -160,87 +183,46 @@ func addCopyright(spells []OldSpell, newSpells map[string]NewSpell) {
 	}
 }
 
-/*
-func formatSpells(spells []OldSpell, newSpells map[string]NewSpell) {
-	//comp := make(map[string]int)
-	errors := make(map[string]string)
+func formatSpells(spells map[string]Spell) {
+	/*for spell := range spells {
+		tmpSpell := spells[spell]
+		if tmpSpell.SpellResistance.Description != nil {
+			tmpSpell.SpellResistance.Applies = strings.Contains(*tmpSpell.SpellResistance.Description, "yes")
+		}
+		spells[spell] = tmpSpell
+	}*/
 
-	for _, spell := range spells {
-		newSpell := NewSpell{}
-		newSpell.Name = spell.Name
-		newSpell.Link = spell.Link
+	keywords := make(map[string][]string)
+	keywords["abjuration"] = []string{}
+	keywords["conjuration"] = []string{"calling", "creation", "healing", "summoning", "teleportation"}
+	keywords["divination"] = []string{"scrying"}
+	keywords["enchantment"] = []string{"charm", "compulsion"}
+	keywords["evocation"] = []string{}
+	keywords["illusion"] = []string{"figment", "glamer", "pattern", "phantasm", "shadow"}
+	keywords["necromancy"] = []string{}
+	keywords["transmutation"] = []string{"polymorph"}
 
-		{
-			words := strings.Split(spell.School, " ")
-			for idx, word := range words {
-				reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
-				word = reg.ReplaceAllString(word, "")
-				switch idx {
-				case 0:
-					newSpell.School.School = word
-				case 1:
-					newSpell.School.SubSchool = word
-				default:
-					newSpell.School.Descriptors = append(newSpell.School.Descriptors, word)
+	for spell := range spells {
+		falseSubschool := true
+		tmpSpell := spells[spell]
+		if tmpSpell.School.SubSchool != nil && !strings.Contains(*tmpSpell.School.SubSchool, "or") {
+			for _, val := range keywords[tmpSpell.School.School] {
+				if val == *tmpSpell.School.SubSchool {
+					falseSubschool = false
+					break
 				}
+			}
+
+			if falseSubschool {
+				desc := *tmpSpell.School.SubSchool
+				tmpSpell.School.Descriptors = append(tmpSpell.School.Descriptors, desc)
+				tmpSpell.School.SubSchool = nil
 			}
 		}
 
-		newSpell.Classes = make(map[string]int)
-		for class, level := range spell.Classes {
-			newSpell.Classes[class], _ = strconv.Atoi(level)
-		}
-
-		newSpell.CastingTime = spell.CastingTime
-
-		for _, c := range spell.Components {
-
-			switch c[0:1] {
-			case "V":
-				newSpell.Components.Verbal = true
-			case "S":
-				newSpell.Components.Somatic = true
-			case "M":
-				if strings.Contains(c, "M/DF") {
-					c = strings.Replace(c, "M/DF", "M", 1)
-					newSpell.Components.DivineFocus = true
-				}
-				newSpell.Components.Material = c
-			case "F":
-				newSpell.Components.Focus = c
-			case "D":
-				newSpell.Components.DivineFocus = true
-				if strings.Contains(c, "DF/M") {
-					c = strings.Replace(c, "DF/M", "M", 1)
-					newSpell.Components.Material = c
-				}
-			}
-		}
-
-		newSpell.Effect.Range = spell.Range
-		newSpell.Effect.Area = spell.Area
-		newSpell.Effect.Target = spell.Target
-		newSpell.Effect.Duration = spell.Duration
-		newSpell.Effect.Description = spell.Description
-
-		newSpell.SavingThrow.Description = spell.SavingThrow
-		newSpell.SavingThrow.Fortitude = strings.Contains(spell.SavingThrow, "Fort")
-		newSpell.SavingThrow.Reflex = strings.Contains(spell.SavingThrow, "Reflex")
-		newSpell.SavingThrow.Will = strings.Contains(spell.SavingThrow, "Will")
-
-		newSpell.SpellResistance.Description = spell.SpellResistance
-		newSpell.SpellResistance.Applies = strings.Contains(spell.SavingThrow, "Yes")
-
-		newSpell.Description = spell.Description
-
-		newSpells[newSpell.Name] = newSpell
+		spells[spell] = tmpSpell
 	}
-
-	fmt.Println(errors)
-	fmt.Println(newSpells["Geyser"])
-
 }
-*/
 
 type School struct {
 	School      string   `json:"school"`
@@ -276,7 +258,7 @@ type SpellResistance struct {
 	Description *string `json:"description"`
 }
 
-type NewSpell struct {
+type Spell struct {
 	Name              string          `json:"name"`
 	Url               string          `json:"url"`
 	School            School          `json:"school"`
